@@ -1,4 +1,8 @@
 ﻿open Avalon.Results
+open Avalon.Ops
+open Avalon.Teams
+open Avalon.Voting
+open Avalon.Quests
 open Avalon.Game
 
 let randomized = System.Random.Shared.Next
@@ -187,8 +191,6 @@ let main args =
                     let voteOnThisQuestForThisTeam = voteOnAQuest randomVotesFromThisTeam
                     let proposeAQuestForThisTeam template = proposeAQuestRandomly template votingTeam
 
-                    // printfn$"::: voting %A{votingTeam}"
-                    // printfn$"::: questing %A{questingTeam}"
                     stdout.WriteLine ""
                     stdout.WriteLine "TTTTTTTTTTT"
                     printf $"{quest.proposedBy |> describeSpecificParticipant} proposes a Quest: {quest.name}! "
@@ -205,7 +207,9 @@ let main args =
 
                     match results with
                     | NoVotesYet -> Error "Nobody even voted!"
-                    | QuestVoteResults.EvilVictory -> Ok (EvilVictory, votingTeam)
+                    | QuestVoteResults.EvilVictory votes-> 
+                        printfn $"{quest.name} was rejected due to the Nay votes of {reportAcceptedVotes QuestNay votes}. "
+                        Ok (EvilVictory, votingTeam)
                     | Accepted (votes, times) ->
                         printfn $"{quest.name} was accepted after {times} votes due to the Yea votes of {reportAcceptedVotes QuestYea votes}"
                         Ok (Settle quest, rotateTeam votingTeam)

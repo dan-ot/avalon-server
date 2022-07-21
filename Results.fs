@@ -1,5 +1,6 @@
 module Avalon.Results
 
+/// Lets us use computation expressions with Result.
 type ResultBuilder() =
     member _.BindReturn(result, f) =
         result |> Result.map f

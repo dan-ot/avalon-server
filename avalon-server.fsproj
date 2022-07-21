@@ -6,7 +6,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Results.fs" />
+    <Compile Include="Ops.fs" />
+    <Compile Include="Teams.fs" />
+    <Compile Include="Voting.fs" />
+    <Compile Include="Quests.fs" />
     <Compile Include="Game.fs" />
+    <Compile Include="StateMachine.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 </Project>
