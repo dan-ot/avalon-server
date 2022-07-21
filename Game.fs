@@ -108,7 +108,7 @@ let makeATeam allPlayers =
     {
         leader = leader
         voters = voters |> Set.ofList
-        nextRotation = voters |> List.append [leader]
+        nextRotation = voters @ [leader]
     }
 
 let rotateTeam team =
@@ -116,7 +116,7 @@ let rotateTeam team =
     {
         leader = newLeader
         voters = team.leader :: formerVoters |> Set.ofList
-        nextRotation = formerVoters @ [team.leader]
+        nextRotation = formerVoters @ [newLeader]
     }
 
 type VoteOnQuest =
@@ -159,7 +159,6 @@ let determineOutcome votingRecord =
 
 type QuestTemplate = {
     population: int
-    name: string
 }
 
 type Quest = {
@@ -172,34 +171,34 @@ let nextQuestTemplateFrom playerBase history =
     match List.length playerBase.players with
     | 5 -> 
         match List.length history with
-        | 0 -> { population = 2; name = "2-person Quest" }
-        | 1 -> { population = 3; name = "3-person Quest" }
-        | 2 -> { population = 2; name = "2-person Quest" }
-        | 3 -> { population = 3; name = "3-person Quest" }
-        | _ -> { population = 3; name = "3-person Quest" }
+        | 0 -> { population = 2 }
+        | 1 -> { population = 3 }
+        | 2 -> { population = 2 }
+        | 3 -> { population = 3 }
+        | _ -> { population = 3 }
     | 6 ->
         match List.length history with
-        | 0 -> { population = 2; name = "2-person Quest" }
-        | 1 -> { population = 3; name = "3-person Quest" }
-        | 2 -> { population = 4; name = "4-person Quest" }
-        | 3 -> { population = 3; name = "3-person Quest" }
-        | _ -> { population = 4; name = "4-person Quest" }
+        | 0 -> { population = 2 }
+        | 1 -> { population = 3 }
+        | 2 -> { population = 4 }
+        | 3 -> { population = 3 }
+        | _ -> { population = 4 }
     | 7 ->
         match List.length history with
-        | 0 -> { population = 2; name = "2-person Quest" }
-        | 1 -> { population = 3; name = "3-person Quest" }
-        | 2 -> { population = 3; name = "3-person Quest" }
-        | 3 -> { population = 4; name = "4-person Quest" }
-        | _ -> { population = 4; name = "4-person Quest" }
+        | 0 -> { population = 2 }
+        | 1 -> { population = 3 }
+        | 2 -> { population = 3 }
+        | 3 -> { population = 4 }
+        | _ -> { population = 4 }
     | _ ->
         match List.length history with
-        | 0 -> { population = 3; name = "3-person Quest" }
-        | 1 -> { population = 4; name = "4-person Quest" }
-        | 2 -> { population = 4; name = "4-person Quest" }
-        | 3 -> { population = 5; name = "5-person Quest" }
-        | _ -> { population = 5; name = "5-person Quest" }
+        | 0 -> { population = 3 }
+        | 1 -> { population = 4 }
+        | 2 -> { population = 4 }
+        | 3 -> { population = 5 }
+        | _ -> { population = 5 }
 
-let proposeAQuest getAMember template team =
+let proposeAQuest getAQuestName getAMember template team =
     let everyone = team.nextRotation |> Set.ofList
     let rec findMembers currentMembers =
         let chosenMember =
@@ -213,7 +212,7 @@ let proposeAQuest getAMember template team =
     {
         proposedBy = team.leader
         members = findMembers Set.empty
-        name = template.name
+        name = getAQuestName template
     }
 
 type QuestVotingState = {
@@ -275,6 +274,7 @@ type QuestHistory = {
 let tabulateQuestResult playerBase history results =
     let failuresRequired = 
         match List.length history, List.length playerBase.players with
+        // The 4th quest (3 quests have passed) takes 2 failures when there are more than 6 players
         | (3, 7) | (3, 8) | (3, 9) | (3, 10) -> 2
         | _ -> 1
     let failuresPresent =
