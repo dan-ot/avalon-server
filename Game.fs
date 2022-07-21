@@ -37,6 +37,18 @@ let extractSeveral (rnd: picker) howMany fs =
             |> fun (_, extracted, remaining) -> (extracted, remaining)
             |> Ok
 
+let extractAndFill fillExtras rnd howMany from =
+    match List.length from with
+    | enough when enough > howMany ->
+        match extractSeveral rnd howMany from with
+        | Ok extracted -> extracted
+        | Error e -> failwith e
+    | exactly when exactly = howMany ->
+        (from, List.empty)
+    | notEnough when notEnough < howMany ->
+        (from @ fillExtras (howMany - notEnough), List.empty)
+    | x -> failwith $"{x} blew up getting {howMany} from {from |> List.length}"
+
 let shuffle (rnd: picker) fs =
     match fs with
     | [] -> []

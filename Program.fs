@@ -3,10 +3,34 @@ open Avalon.Game
 
 let randomized = System.Random.Shared.Next
 
+let extraPlayerNames = [
+    "Ser Mix-A-Lot"
+    "Mack the Knife"
+    "Lady Blinia"
+    "Robin of Locksley"
+    "John Locke"
+    "The King of Thieves"
+    "A Hermit"
+    "Lord John"
+    "Dame Olivia"
+    "Deuce"
+    "Frank the Frank"
+    "Edgar of the Scots"
+    "An Empty Suit of Armor"
+    "The Green Knight"
+    ]
+
 let createGenericPlayers count =
-    seq { for p in 1 .. count do  $"Player {p}" }
-    |> Seq.map (fun p -> { name = p })
-    |> List.ofSeq
+    let (chosen, _) = 
+        extractAndFill
+            (fun needed -> 
+                seq { for p in 1 .. needed do  $"Player {p}" }
+                |> List.ofSeq
+            )
+            randomized
+            count
+            extraPlayerNames
+    chosen |> List.map (fun c -> { name = c })
 
 let renderPlayer (p: Player) = p.name
 let describeParticipant (p, c) = $"{renderPlayer p} is {c}"
