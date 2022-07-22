@@ -19,13 +19,13 @@ let validatePopulation players =
 
 let calculateHowManyAreGood playerBase =
     match List.length playerBase.players with
-    | 5 -> Ok 3
-    | 6 -> Ok 4
-    | 7 -> Ok 4
-    | 8 -> Ok 5
-    | 9 -> Ok 6
-    | 10 -> Ok 6
-    | x -> Error $"Incorrect number of players, cannot distribute: {x}"
+    | 5 -> 3
+    | 6 -> 4
+    | 7 -> 4
+    | 8 -> 5
+    | 9 -> 6
+    | 10 -> 6
+    | x -> failwith $"Incorrect number of players, cannot distribute: {x}"
 
 type Character = 
     | Good
@@ -40,17 +40,41 @@ type Character =
         | Merlin -> "Merlin"
         | TheAssassin -> "The Assassin"
 
-let determineCharacters rnd playerBase =
-    resultOf {
-        let! good = calculateHowManyAreGood playerBase
-        let rearranged = shuffle rnd playerBase.players
-        let (good, evil) = List.splitAt good rearranged
-        let merlin = good.Head, Merlin
-        let otherGood = good.Tail |> List.map (fun g -> g, Good)
-        let assassin = evil.Head, TheAssassin
-        let otherEvil = evil.Tail |> List.map (fun e -> e, Evil)
-        return (merlin :: assassin :: otherGood @ otherEvil) |> Map.ofList
+type Participants = {
+    map: Map<Player, Character>
+}
+
+let participantsFromPairs pairs =
+    {
+        map = Map.ofList pairs
     }
+
+let roleFor participants isPlayer =
+    participants.map
+    |> Map.find isPlayer
+
+let whoIs role participants =
+    participants.map
+    |> Map.findKey (fun _ c -> c = role)
+
+let whoAre role participants =
+    participants.map
+    |> Map.toSeq
+    |> Seq.filter (fun (_, c) -> role |> List.contains c)
+    |> Seq.map (fun (p, _) -> p)
+
+let determineCharacters rnd playerBase =
+    let good = calculateHowManyAreGood playerBase
+    let (good, evil) = 
+        playerBase.players
+        |> extractSeveral rnd good
+        |> orFail
+    let merlin = good.Head, Merlin
+    let otherGood = good.Tail |> List.map (fun g -> g, Good)
+    let assassin = evil.Head, TheAssassin
+    let otherEvil = evil.Tail |> List.map (fun e -> e, Evil)
+    (merlin :: assassin :: otherGood @ otherEvil) 
+        |> participantsFromPairs
 
 type Team = {
     leader: Player
@@ -73,10 +97,3 @@ let rotateTeam team =
         voters = team.leader :: formerVoters |> Set.ofList
         nextRotation = formerVoters @ [newLeader]
     }
-
-
-type TeamPhases =
-    | GatheredPlayers of Player list
-    | FormedAPlayerBase of PlayerBase
-    | AssignedRoles of Map<Player, Character>
-    | InitialTeam of Team

@@ -11,7 +11,7 @@
     <Compile Include="Voting.fs" />
     <Compile Include="Quests.fs" />
     <Compile Include="Game.fs" />
-    <Compile Include="StateMachine.fs" />
+    <Compile Include="RandomBot.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 </Project>

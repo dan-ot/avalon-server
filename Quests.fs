@@ -72,7 +72,12 @@ type QuestVoteResults =
     /// Once it has been Accepted it shouldn't be voted on again
     | Accepted of VotingRecord * int
     /// Once Evil is victorious it shouldn't be voted on again
-    | EvilVictory of VotingRecord
+    | GoodInaction of VotingRecord
+
+
+type QuestSettleResult =
+    | Settle of Quest
+    | GoodInaction
 
 let voteOnAQuest getAVote team state =
     match state with
@@ -88,9 +93,9 @@ let voteOnAQuest getAVote team state =
         | QuestYea -> Accepted (record, thisVoteWas)
         | QuestNay ->
             match thisVoteWas with
-            | 5 -> EvilVictory record
+            | 5 -> QuestVoteResults.GoodInaction record
             | _ -> Rejected (record, thisVoteWas)
-    | Accepted _ | EvilVictory _ -> state
+    | Accepted _ | QuestVoteResults.GoodInaction _ -> state
 
 type QuestResult =
     | QuestSuccess

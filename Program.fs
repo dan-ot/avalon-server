@@ -51,8 +51,19 @@ let rec keepChoosing from =
         keepChoosing from
 
 let joined (ss: string seq) =
-    System.String.Join (", ", ss)
-
+    let ll = ss |> List.ofSeq
+    
+    match ll with
+    | [] -> ""
+    | [s] -> s
+    | [s1; s2] -> String.concat "" ([s1; " and "; s2])
+    | moreThan2 ->
+        let head, tail = List.head moreThan2, List.tail moreThan2
+        [for _ in 1 .. (List.length tail - 1) do ", "] @ [", and "]
+        |> List.zip tail
+        |> List.fold 
+            (fun b (v, s) -> String.concat "" (seq {b; s; v}))
+            head
 
 let oneOf several =
     match extractOne randomized several with
@@ -81,15 +92,7 @@ let nameAQuest template =
         "Five Sharp Minds to Find Where Missing Socks Go"
         "Five Sturdy Fellows to Vangquish a Giant (he's over 6 feet!)"
         ]
-    | _ -> "Inappropriate number of people to quest!"
-
-type QuestSettleResult =
-    | Settle of Quest
-    | EvilVictory
-
-type FinalVictory =
-    | Good
-    | Evil
+    | _ -> failwith "Inappropriate number of people to quest!"
 
 [<EntryPoint>]
 let main args =
@@ -105,12 +108,13 @@ let main args =
             createGenericPlayers playerCount
             |> shuffle randomized
             |> validatePopulation
-        let! participants = players |> determineCharacters randomized
+        let participants = players |> determineCharacters randomized
         
+        let currentRoleFor = roleFor participants
+
         let describeSpecificParticipant p =
-            match participants.TryFind p with
-            | Some c -> $"{renderPlayer p} ({c})"
-            | None -> $"No such player {renderPlayer p}"
+            let c = currentRoleFor p
+            $"{renderPlayer p} ({c})"
 
         let rec randomVotes quest team votingRecord =
             let whoHasVoted =
@@ -142,20 +146,14 @@ let main args =
             |> Map.toSeq
             |> Seq.filter (fun (_, v) -> v = voteKind)
             |> Seq.map (fun (p, _) -> describeSpecificParticipant p)
-            |> fun ss -> System.String.Join (", ", ss)
+            |> joined
         
         let questFateForThesePlayers = determineQuestFate players
 
         let rec pickAQuestFate from =
             let r = resultOf {
                 let! (player, _) = from |> extractOne randomized
-                let! character = 
-                    participants 
-                    |> Map.tryFind player
-                    |> fun found ->
-                        match found with
-                        | Some ch -> Ok ch
-                        | None -> Error $"Player {renderPlayer player} wasn't found!"
+                let character = currentRoleFor player
                 let! (result, _) = 
                     presentPossibleResults character
                     |> extractOne randomized
@@ -170,7 +168,7 @@ let main args =
 
         stdout.WriteLine ""
         stdout.WriteLine "=========="
-        stdout.WriteLine (participants |> Map.toList |> List.map describeParticipant |> fun ss -> System.String.Join (", ", ss))
+        stdout.WriteLine (participants.map |> Map.toList |> List.map describeParticipant |> joined)
         printfn $"The turn order is {(makeATeam players).nextRotation |> List.map renderPlayer |> joined}"
         stdout.WriteLine "=========="
         stdout.WriteLine ""
@@ -180,7 +178,7 @@ let main args =
         let nextQuestTemplateForThesePlayers = nextQuestTemplateFrom players
 
         let rec questUntilVictory questHistory questingTeam =
-            let gameResult = resultOf {
+            let questsResult = resultOf {
                 let questTemplate = nextQuestTemplateForThesePlayers questHistory
                 
                 let rec settleOnThisQuestTemplateOrLose votingTeam priorResults =
@@ -207,9 +205,9 @@ let main args =
 
                     match results with
                     | NoVotesYet -> Error "Nobody even voted!"
-                    | QuestVoteResults.EvilVictory votes-> 
+                    | QuestVoteResults.GoodInaction votes-> 
                         printfn $"{quest.name} was rejected due to the Nay votes of {reportAcceptedVotes QuestNay votes}. "
-                        Ok (EvilVictory, votingTeam)
+                        Ok (QuestSettleResult.GoodInaction, votingTeam)
                     | Accepted (votes, times) ->
                         printfn $"{quest.name} was accepted after {times} votes due to the Yea votes of {reportAcceptedVotes QuestYea votes}"
                         Ok (Settle quest, rotateTeam votingTeam)
@@ -225,8 +223,8 @@ let main args =
                 stdout.WriteLine "QQQQQQQQQQQ"
                 return 
                     match settleQuest with
-                    | EvilVictory ->
-                        (GameResult.EvilVictory, newQuestingTeam)
+                    | QuestSettleResult.GoodInaction ->
+                        (FinishedQuesting GoodInaction, newQuestingTeam)
                     | Settle acceptedQuest ->
                         let questFate = 
                             questFateForThesePlayers
@@ -235,40 +233,42 @@ let main args =
                                 acceptedQuest
                         printfn $"{questFate.quest.name} {describeQuestFate questFate.result}ed!"
                         let newQuestHistory = questFate :: questHistory
-                        (determineGameResult newQuestHistory, newQuestingTeam)
+                        (determineQuestsResult newQuestHistory, newQuestingTeam)
             }
-            match gameResult with
-            | Ok (GoodVictory, _) -> Good
-            | Ok (GameResult.EvilVictory, _) -> Evil
-            | Ok (StillPlaying newHistory, newTeam) ->
+            match questsResult with
+            | Ok (FinishedQuesting finishedQuesting, _) -> finishedQuesting
+            | Ok (StillQuesting newHistory, newTeam) ->
                 questUntilVictory newHistory newTeam
             | Error e ->
                 stdout.WriteLine e
                 questUntilVictory questHistory questingTeam
         
+        let doneQuesting = questUntilVictory List.empty (makeATeam players)
+        let assassination = (prepareAssassination randomized participants)
         stdout.WriteLine ""
-        match questUntilVictory List.empty (makeATeam players) with
-        | Good ->
-            printfn "All quests were successful. BUT!"
-            let (assassin, goodGuys) = prepareAssassination participants
-            printfn $"{renderPlayer assassin} the Assassin has one last chance! If they can pick Merlin out from the Good lineup ({goodGuys |> Seq.map (fun (g, _) -> renderPlayer g) |> joined}), Evil may yet win..."
-            
-            let rec pickATarget () =
-                match extractOne randomized goodGuys with
-                | Ok (pick, _) -> pick
-                | Error e ->
-                    stdout.WriteLine e
-                    pickATarget ()
+        do match doneQuesting with
+            | GoodMajority ->
+                printfn "All quests were successful. BUT!"
+                printfn $"{renderPlayer assassination.assassin} the Assassin has one last chance! If they can pick Merlin out from the Good players ({assassination.allTargets |> Seq.map renderPlayer |> joined}), Evil may yet win..."
+            | _ -> ()
 
-            let (targetPlayer, targetCharacter) = pickATarget ()
-            printfn $"{renderPlayer assassin} has chosen {renderPlayer targetPlayer}!"
-            match targetCharacter with
-            | Merlin ->
-                printfn "Who was Merlin! With Merlin dead, Evil has triumphed! Arther's reign has ended, and Britain will remain a monarchy forever!"
-            | _ ->
-                printfn "Who was NOT Merlin! Good has triumphed! The blessed reign of Camelot will continue for a whole two years!"
-        | Evil ->
+        let gameResult =
+            resolveGame
+                (fun targets -> 
+                    let choice = oneOf targets
+                    printfn $"The assassin chooses {renderPlayer choice}!"
+                    choice)
+                doneQuesting
+                assassination
+        match gameResult with
+        | GoodVictory ->
+            printfn "Who was NOT Merlin! Good has triumphed! The blessed reign of Camelot will continue for a whole two years!"
+        | EvilVictory Quests ->
             printfn "Evil has triumphed! Arthur's reign has ended, and Britain will remain a monarchy forever!"
+        | EvilVictory Inaction ->
+            printfn "Evil has triumphed through the inaction of good! The people despair of their rulers being able to take action on any issue in the future!"
+        | EvilVictory Assassination ->
+            printfn "Who was Merlin! With Merlin dead, Evil has triumphed! Arther's reign has ended, and Britain will remain a monarchy forever!"
     }
     match exit with
         | Ok _ -> 0

@@ -1,36 +1,65 @@
 module Avalon.Game
 open Teams
 open Quests
+open Ops
 
-type GamePhases =
-    | FormATeam
-    | DecideAQuest
-    | GoQuesting
-    | ResolveTheClimax
+type FinishedQuesting =
+    | GoodMajority
+    | GoodInaction
+    | EvilMajority
 
-type GameResult =
-    | StillPlaying of QuestHistory list
-    | GoodVictory
-    | EvilVictory
+type QuestsResult =
+    | StillQuesting of QuestHistory list
+    | FinishedQuesting of FinishedQuesting
 
-let determineGameResult questHistory =
+let determineQuestsResult questHistory =
     if questHistory |> List.filter (fun h -> h.result = QuestSuccess) |> List.length = 3 then
-        GoodVictory
+        FinishedQuesting GoodMajority
     else if questHistory |> List.filter (fun h -> h.result = QuestFailure) |> List.length = 3 then
-        EvilVictory
+        FinishedQuesting EvilMajority
     else
-        StillPlaying questHistory
+        StillQuesting questHistory
 
-let prepareAssassination participants =
-    let (assassin, _) = 
+type AssassinationAttempt = {
+    assassin: Player
+    merlin: Player
+    allTargets: Player list
+}
+
+let prepareAssassination rnd participants =
+    let assassin = 
         participants
-        |> Map.toSeq
-        |> Seq.filter (fun (_, c) -> c = TheAssassin)
-        |> Seq.head
+        |> whoIs TheAssassin
     
+    let merlin =
+        participants
+        |> whoIs Merlin
+
     let goodGuys =
         participants
-        |> Map.toSeq
-        |> Seq.filter (fun (_, c) -> c = Merlin || c = Good)
+        |> whoAre [Good]
+        |> List.ofSeq
 
-    (assassin, goodGuys)
+    let allTargets = shuffle rnd (merlin :: goodGuys)
+
+    { assassin = assassin; merlin = merlin; allTargets = allTargets}
+
+type EvilVictory =
+    | Quests
+    | Inaction
+    | Assassination
+
+type GameResult =
+    | GoodVictory
+    | EvilVictory of EvilVictory
+
+let resolveGame pickATarget questsResult assassination =
+    match questsResult with
+    | EvilMajority -> EvilVictory Quests
+    | GoodInaction -> EvilVictory Inaction
+    | GoodMajority ->
+        let assassinate = pickATarget assassination.allTargets
+        if assassinate = assassination.merlin then
+            EvilVictory Assassination
+        else
+            GoodVictory

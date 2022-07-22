@@ -1,0 +1,2 @@
+module Avalon.RandomBot
+
